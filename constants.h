@@ -1,0 +1,13 @@
+#ifndef CONSTANTS_MODULE
+#define CONSTANTS_MODULE
+
+#define PORT 8080
+#define BUF_SIZE 4096
+
+#define NUMBER_OF_CARDS 36
+#define NUMBER_OF_INIT_CARDS 6
+#define NUMBER_OF_PLAYERS 2
+#define DESK_SIZE 6
+#define NUMBER_OF_SUITS 4
+
+#endif
