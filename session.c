@@ -118,10 +118,16 @@ void session_do_write(struct server *s, int index)
         return;
     }
     int old_buf_size = s->buf_size;
-    for (int i = 0; i < s->g->players[index].cards_count; i++)
-        s->buf_size += snprintf(s->buf + s->buf_size, BUF_SIZE, "%d:%s%c ", i,
-                                card_imgs[s->g->players[index].cards[i] / NUMBER_OF_SUITS],
-                                card_suit_imgs[s->g->players[index].cards[i] % NUMBER_OF_SUITS]);
+    for (int i = 0; i < s->g->players[index].cards_count; i++) {
+        int card = s->g->players[index].cards[i];
+        if (card == -1)
+            s->buf_size += snprintf(s->buf + s->buf_size, BUF_SIZE, "%d:%s%c ", i, " ", ' ');
+        else
+            s->buf_size += snprintf(s->buf + s->buf_size, BUF_SIZE, "%d:%s%c ", i,
+                                    card_imgs[s->g->players[index].cards[i] / NUMBER_OF_SUITS],
+                                    card_suit_imgs[s->g->players[index].cards[i] % NUMBER_OF_SUITS]);
+
+    }
     s->buf_size += snprintf(s->buf + s->buf_size, BUF_SIZE, "\nYou are player №: %d", s->sessions[index]->game_id);
     if (s->g->defender == index)
         s->buf_size += snprintf(s->buf + s->buf_size, BUF_SIZE, "(DEFENSE)\n");
