@@ -134,6 +134,32 @@ void reset_table(int *table, int *size)
     *size = 0;
 }
 
+void select_defender(struct game *g, int offset)
+{
+    for (int i = g->defender + 1; i < NUMBER_OF_PLAYERS + g->defender; i++) {
+        if (g->players[i % NUMBER_OF_PLAYERS].cards_count == 0)
+            continue;
+        offset--;
+        if (offset == 0) {
+            g->defender = i % NUMBER_OF_PLAYERS;
+            break;
+        }
+    }
+}
+
+void select_attacker(struct game *g, int offset)
+{
+    for (int i = g->attacker+ 1; i < NUMBER_OF_PLAYERS + g->attacker; i++) {
+        if (g->players[i % NUMBER_OF_PLAYERS].cards_count == 0)
+            continue;
+        offset--;
+        if (offset == 0) {
+            g->attacker = i % NUMBER_OF_PLAYERS;
+            break;
+        }
+    }
+}
+
 void select_next_attacker_and_defender(struct game *g)
 {
     printf("{game.c}:[select_next_attacker_and_defender]\n");
@@ -142,9 +168,9 @@ void select_next_attacker_and_defender(struct game *g)
         offset = 2;
     else
         offset = 1;
-    g->defender = (g->defender + offset) % NUMBER_OF_PLAYERS;
-    g->attacker = (g->attacker + offset) % NUMBER_OF_PLAYERS;
-    printf("new attacker: %d\nnew defender: %d\n", g->attacker, g->defender);
+    select_defender(g, offset);
+    select_attacker(g, offset);
+    printf("attacker: %d\ndefender: %d\n", g->attacker, g->defender);
 }
 
 void reset_round_time(struct game_time *t)

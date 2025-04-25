@@ -56,6 +56,8 @@ int is_game_end(struct game *g);
 void game_end(struct game *g);
 
 void reset_table(int *table, int *size);
+void select_defender(struct game *g, int offset);
+void select_attacker(struct game *g, int offset);
 void select_next_attacker_and_defender(struct game *g);
 void reset_round_time(struct game_time *t);
 void update_players(struct game *g);
