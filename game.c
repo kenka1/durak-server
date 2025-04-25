@@ -351,6 +351,10 @@ int player_can_attack(struct game *g, struct session *ss)
     if (g->attack_count == DESK_SIZE)
         return -1;
 
+    /* table == defender cards count */
+    if (g->players[g->defender].cards_count + g->defensive_count == g->attack_count)
+        return -1;
+
     /* attack table doesn't have card and player is not first attacker */
     if (g->attack_count == 0 && ss->game_id != g->attacker)
         return -1;
