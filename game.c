@@ -4,14 +4,13 @@
 #include <string.h>
 
 #include "game.h"
-#include "cards.h"
 #include "constants.h"
 #include "session.h"
 #include "server.h"
 
 void game_shuffling(struct game *g)
 {
-    printf("[game_shuffling]\n");
+    printf("{game.c}:[game_shuffling]\n");
     int flags[NUMBER_OF_CARDS] = {0};
     int index;
 
@@ -33,11 +32,26 @@ void game_shuffling(struct game *g)
     g->attack_count = 0;
     g->defensive_count = 0;
     g->trump_suit = rand() / ((RAND_MAX + 1u) / NUMBER_OF_SUITS);
+    g->state = gs_fist_attack;
+}
+
+void fill_players_cards(struct game *g, int player_id)
+{
+    printf("{game.c}:[fill_players_cards]\n");
+    int *cards, *desk, *cards_count, *desk_count;
+
+    cards = g->players[player_id].cards;
+    desk = g->cards;
+    cards_count = &g->players[player_id].cards_count;
+    desk_count = &g->cards_count;
+
+    for (; *cards_count < NUMBER_OF_INIT_CARDS && *desk_count > 0; (*cards_count)++, (*desk_count)--)
+        cards[*cards_count] = desk[*desk_count - 1];
 }
 
 int game_first_attacker(struct game *g)
 {
-    printf("[game_first_attacker]\n");
+    printf("{game.c}:[game_first_attacker]\n");
     int attacker = -1;
     int min = NUMBER_OF_CARDS + 1;
     for (int i = 0; i < NUMBER_OF_PLAYERS; i++) {
@@ -56,60 +70,143 @@ int game_first_attacker(struct game *g)
     return attacker;
 }
 
-void game_init_players(struct game *g)
+void game_first_attacker_and_defender(struct game *g)
 {
-    printf("[game_init_players]\n");
-    for (int i = 0; i < NUMBER_OF_PLAYERS; i++) {
-        for (int k = 0; k < NUMBER_OF_INIT_CARDS; k++)
-            g->players[i].cards[k] = g->cards[g->cards_count-- - 1];
-        g->players[i].cards_count = NUMBER_OF_INIT_CARDS;
-    }
+    printf("{game.c}:[game_first_attacker_and_defender]\n");
     g->attacker = game_first_attacker(g);
     g->defender = (g->attacker + 1) % NUMBER_OF_PLAYERS;
+    printf("attacker: %d\ndefender: %d\n", g->attacker, g->defender);
+}
+
+void game_init_players(struct game *g)
+{
+    printf("{game.c}:[game_init_players]\n");
+    for (int i = 0; i < NUMBER_OF_PLAYERS; i++) {
+        g->players[i].cards_count = 0;
+        fill_players_cards(g, i);
+    }
+    game_first_attacker_and_defender(g);
+}
+
+void game_init_time(struct game_time *t)
+{
+    printf("{game.c}:[game_init_time]\n");
+    t->start_time = time(NULL);
+    t->current_time = t->start_time;
+    t->round_start = t->start_time;
+    t->round_time = 0;
+    t->number_of_round = 0;
 }
 
 struct game* game_init()
 {
-    printf("[game_init]\n");
+    printf("{game.c}:[game_init]\n");
     struct game *g = malloc(sizeof(struct game));
     game_shuffling(g);
     game_init_players(g);
+    game_init_time(&g->t);
     return g;
 }
 
-void game_next(struct game *g)
+int is_game_end(struct game *g)
 {
-    g->attack_count = 0;
-    for (int i = 0; i < DESK_SIZE; i++)
-        g->table_attack[i] = -1;
-    g->defensive_count = 0;
-    for (int i = 0; i < DESK_SIZE; i++)
-        g->table_defensive[i] = -1;
-    while ((g->attacker = (g->attacker + 1) % NUMBER_OF_PLAYERS) == g->defender);
-    g->defender = (g->defender + 2) % NUMBER_OF_PLAYERS;
+    printf("{game.c}:[is_game_end]\n");
+    for (int i = 0; i < NUMBER_OF_PLAYERS; i++) {
+        if (i == g->defender)
+            continue;
+        if (g->players[i].cards_count != 0)
+            return 0;
+    }
+    
+    if (g->players[g->defender].cards_count != 0)
+        g->state = gs_game_end;
+    else
+        g->state = gs_game_end_draw;
+
+    return 1;
 }
 
-void defender_take(struct game *g, int player_id)
+void reset_table(int *table, int *size)
 {
-    printf("[defender_take]\n");
-    int *count, *cards;
+    printf("{game.c}:[reset_table]\n");
+    for (int i = 0; i < DESK_SIZE; i++)
+        table[i] = -1;
+    *size = 0;
+}
+
+void select_next_attacker_and_defender(struct game *g)
+{
+    printf("{game.c}:[select_next_attacker_and_defender]\n");
+    int offset;
+    if (g->state == gs_defender_lost)
+        offset = 2;
+    else
+        offset = 1;
+    g->defender = (g->defender + offset) % NUMBER_OF_PLAYERS;
+    g->attacker = (g->attacker + offset) % NUMBER_OF_PLAYERS;
+    printf("new attacker: %d\nnew defender: %d\n", g->attacker, g->defender);
+}
+
+void reset_round_time(struct game_time *t)
+{
+    printf("{game.c}:[reset_round_time]\n");
+    t->round_start = time(NULL);
+    t->round_time = 0;
+    t->number_of_round++;
+}
+
+void update_players(struct game *g)
+{
+    printf("{game.c}:[update_players]\n");
+    for (int i = g->attacker; i < NUMBER_OF_PLAYERS + g->attacker; i++) {
+        if (i % NUMBER_OF_PLAYERS == g->defender)
+            continue;
+        fill_players_cards(g, i % NUMBER_OF_PLAYERS);
+    }
+    fill_players_cards(g, g->defender);
+}
+
+void game_next_round(struct game *g)
+{
+    printf("{game.c}:[game_next_round]\n");
+    reset_table(g->table_attack, &g->attack_count);
+    reset_table(g->table_defensive, &g->defensive_count);
+    update_players(g);
+    select_next_attacker_and_defender(g);
+    reset_round_time(&g->t);
+    *g->redraw = 1;
+    g->state = gs_fist_attack;
+}
+
+void defender_take_cards(struct game *g)
+{
+    printf("{game.c}:[defender_take_cards]\n");
+    for (int i = 0; i < g->defensive_count; i++) {
+        g->players[g->defender].cards[g->players[g->defender].cards_count++] = g->table_defensive[i];
+    }
+    for (int i = 0; i < g->attack_count; i++) {
+        g->players[g->defender].cards[g->players[g->defender].cards_count++] = g->table_attack[i];
+    }
+}
+
+void defender_lost_round(struct game *g)
+{
+    printf("{game.c}:[defender_lost_round]\n");
     if (g->attack_count == 0)
         return;
 
-    count = &g->players[player_id].cards_count;
-    cards = g->players[player_id].cards;
-    for (int i = 0; i < g->defensive_count; i++) {
-        cards[(*count)++] = g->table_defensive[i];
+    if (is_game_end(g)) {
+        return;
     }
-    for (int i = 0; i < g->attack_count; i++) {
-        cards[(*count)++] = g->table_attack[i];
-    }
-    game_next(g);
+
+    defender_take_cards(g);
+    g->state = gs_defender_lost;
+    game_next_round(g);
 }
 
 int* player_can_defend(struct game *g, struct session *ss)
 {
-    printf("[player_can_defend]\n");
+    printf("{game.c}:[player_can_defend]\n");
     int res, attack_index, def_index;
     int *card_indices;
 
@@ -150,6 +247,7 @@ int* player_can_defend(struct game *g, struct session *ss)
 
 int cards_same_suit(int card0, int card1)
 {
+    printf("{game.c}:[cards_same_suit]\n");
     if (card0 % NUMBER_OF_SUITS == card1 % NUMBER_OF_SUITS)
         return 1;
     return 0;
@@ -157,45 +255,47 @@ int cards_same_suit(int card0, int card1)
 
 int check_card_suit(int card, int suit)
 {
-    printf("[check_card_suit]\n");
+    printf("{game.c}:[check_card_suit]\n");
     if (card % NUMBER_OF_SUITS == suit)
         return 1;
     return 0;
 }
 
-void defense(struct game *g, int player_id, int *cards)
+void defense(struct game *g, int *cards)
 {
-    g->table_defensive[cards[0]] = g->players[player_id].cards[cards[1]];
-    player_threw_card(&g->players[player_id], cards[1]);
+    printf("{game.c}:[defense]\n");
+    g->table_defensive[cards[0]] = g->players[g->defender].cards[cards[1]];
+    player_threw_card(&g->players[g->defender], cards[1]);
     g->defensive_count++;
+    *g->redraw= 1;
 }
 
-void player_do_defense(struct game *g, int player_id, int *cards)
+void player_do_defense(struct game *g, int *cards)
 {
-    printf("[player_do_defense]\n");
+    printf("{game.c}:[player_do_defense]\n");
     int attack_card, def_card;
 
     attack_card = g->table_attack[cards[0]];
-    def_card = g->players[player_id].cards[cards[1]];
+    def_card = g->players[g->defender].cards[cards[1]];
     printf("attack_card: %d\ndef_card: %d\n", attack_card, def_card);
     printf("attack_card_suit: %d\ndef_car_suit: %d\ntrump_suit: %d\n", attack_card % NUMBER_OF_SUITS, def_card % NUMBER_OF_SUITS, g->trump_suit);
 
     if (cards_same_suit(attack_card, def_card)) {
         if (def_card > attack_card)
-            defense(g, player_id, cards);
+            defense(g, cards);
     }
 
     if (check_card_suit(def_card, g->trump_suit))
-        defense(g, player_id, cards);
+        defense(g, cards);
 }
 
 void game_handle_defender_input(struct game *g, struct session *ss)
 {
-    printf("[game_handle_defender_input]\n");
+    printf("{game.c}:[game_handle_defender_input]\n");
     int *card_indices;
 
     if (strcmp(ss->buf, "take") == 0) {
-        defender_take(g, ss->game_id);
+        defender_lost_round(g);
         return;
     }
 
@@ -203,7 +303,7 @@ void game_handle_defender_input(struct game *g, struct session *ss)
     if(card_indices == NULL)
         return; 
 
-    player_do_defense(g, ss->game_id, card_indices);
+    player_do_defense(g, card_indices);
 
     free(card_indices);
 
@@ -211,7 +311,7 @@ void game_handle_defender_input(struct game *g, struct session *ss)
 
 int player_can_attack(struct game *g, struct session *ss)
 {
-    printf("[player_can_attack]\n");
+    printf("{game.c}:[player_can_attack]\n");
     int res, card_index;
 
     /* player doesn't have cards */
@@ -239,7 +339,7 @@ int player_can_attack(struct game *g, struct session *ss)
 
 void player_threw_card(struct player *p, int card_index)
 {
-    printf("[player_threw_card]\n");
+    printf("{game.c}:[player_threw_card]\n");
     for (int i = card_index; i < p->cards_count - 1; i++)
         p->cards[i] = p->cards[i + 1];
     p->cards_count--;
@@ -247,14 +347,16 @@ void player_threw_card(struct player *p, int card_index)
 
 void attack(struct game *g, int player_id, int card_index)
 {
-    printf("[player_attack]\n");
+    printf("{game.c}:[player_attack]\n");
     g->table_attack[g->attack_count++] = g->players[player_id].cards[card_index];
     player_threw_card(&g->players[player_id], card_index);
+    g->state = gs_attack;
+    *g->redraw = 1;
 }
 
 int card_in_table(struct game *g, int card)
 {
-    printf("[card_in_table]\n");
+    printf("{game.c}:[card_in_table]\n");
     int lvl = card / NUMBER_OF_SUITS;
 
     printf("lvl: %d\n", lvl);
@@ -271,7 +373,7 @@ int card_in_table(struct game *g, int card)
 
 void game_handle_attacker_input(struct game *g, struct session *ss)
 {
-    printf("[game_handle_attacker_input]\n");
+    printf("{game.c}:[game_handle_attacker_input]\n");
     int card_index, card;
 
     card_index = player_can_attack(g, ss);
@@ -290,9 +392,55 @@ void game_handle_attacker_input(struct game *g, struct session *ss)
 
 void game_handle_command(struct game *g, struct session *ss)
 {
-    printf("[game_handle_command]\n");
+    printf("{game_handle_command}:[game_handle_command]\n");
     if (ss->game_id == g->defender)
         game_handle_defender_input(g, ss);
     else
         game_handle_attacker_input(g, ss);
+}
+
+void game_time(struct game_time *t)
+{
+    printf("{game.c}:[game_time]\n");
+    t->current_time = time(NULL);
+    t->round_time = t->current_time - t->round_start;
+    printf("round_time: %lu\n", t->round_time);
+}
+
+int is_defender_lose(struct game *g)
+{
+    printf("{game.c}:[is_defender_lose]\n");
+    printf("attack_count: %d\ndefensive_count: %d\n", g->attack_count, g->defensive_count);
+    if (g->attack_count == g->defensive_count)
+        return 0;
+    return 1;
+}
+
+int is_round_time_over(int time)
+{
+    printf("{game.c}:[is_round_time_over]\n");
+    if (time < ROUND_TIME)
+        return 0;
+    return 1;
+}
+
+void game_round_end(struct game *g)
+{
+    printf("{game.c}:[game_round_end]\n");
+    if (is_defender_lose(g))
+        defender_lost_round(g); 
+    else
+        game_next_round(g);
+}
+
+void game_processing(struct game *g)
+{
+    printf("{game.c}:[game_processing]\n");
+    game_time(&g->t);
+  
+    if (is_game_end(g))
+        return;
+
+    if (is_round_time_over(g->t.round_time))
+        game_round_end(g);
 }
