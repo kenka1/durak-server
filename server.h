@@ -9,14 +9,24 @@
 
 struct game;
 
-#define GAME_RULES "==============================RULES==============================\n" \
-                   "For attacker use:\n<card number><CR><LF>\n5<CR><LF>\n" \
-                   "For Defender use:\n<card number in table attack> <card number to defense><CR><LF>\n3 2<CR><LF>\n" \
-                   "@ - Hearts\n+ - Clubs\n^ - Diamonds\n# - Spades\n"
+#define CLEAR_TEXT 
 
-#define SERVER_FDS 2
-#define LISTEND_FD 0
-#define EVENT_FD 1
+#define LOBBY_TEXT "\033[2J\033[H" \
+                   "Press ENTER to ready\n" \
+                   "Number of player in lobby: (%lu/%d) ================= Ready: (%d/%d)\r\n"
+
+#define GAME_RULES "\033[2J\033[H" \
+                   "==============================RULES==============================\n" \
+                   "For attacker use:\n<card number><CR><LF>\n5<CR><LF>\n" \
+                   "For Defender use:\n<card number in table attack> <card number to defense><CR><LF>\n<take> - pick up the cards\n3 2<CR><LF>\n" \
+                   "@ - Hearts\n+ - Clubs\n^ - Diamonds\n# - Spades\n" \
+                   "Round time: %d seconds\n"
+
+
+#define GAME_INFO "==============================GAME===============================\n" \
+                  "attacker: %d | defender: %d | trump suit: %c\n" \
+                  "Round: %d\n" \
+                  "Desk size: %d\n" \
 
 #define LOG_FILE "./log.txt"
 
@@ -34,7 +44,8 @@ struct game;
 enum server_state{
     ss_lobby,
     ss_game_init,
-    ss_game
+    ss_game,
+    ss_end
 };
 
 struct server{
@@ -44,6 +55,8 @@ struct server{
     char  buf[BUF_SIZE];
     nfds_t nfds;
     int buf_size;
+    int ready;
+    int redraw;
     enum server_state state;
 };
 
@@ -56,13 +69,21 @@ void server_reset_notification(struct server *s);
 
 void server_lobby(struct server *s);
 
+void server_draw_rules(struct server *s);
+void server_draw_game_info(struct server *s);
+void server_draw_attack_table(struct server *s);
+void server_draw_defense_table(struct server *s);
+void server_draw_hand(struct server *s);
 void server_draw_game(struct server *s);
 void server_game_init(struct server *s);
 
 void server_game(struct server *s);
 
+void server_end(struct server *s);
+
 void server_fsm(struct server *s);
 
+void server_redraw(struct server *s);
 void server_start(struct server *s);
 
 #endif
