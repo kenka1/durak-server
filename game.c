@@ -158,6 +158,9 @@ void reset_round_time(struct game_time *t)
 void update_players(struct game *g)
 {
     printf("{game.c}:[update_players]\n");
+    if (g->cards_count == 0)
+        return;
+
     for (int i = g->attacker; i < NUMBER_OF_PLAYERS + g->attacker; i++) {
         if (i % NUMBER_OF_PLAYERS == g->defender)
             continue;
