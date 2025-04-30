@@ -1,3 +1,4 @@
+#include "server_init.h"
 #include "server.h"
 
 int main()

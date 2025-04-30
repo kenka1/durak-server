@@ -11,6 +11,7 @@ set(SOURCES
     cards.c
     game.c
     session.c
+    server_init.c
     server.c
     main.c
 )
