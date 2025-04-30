@@ -36,6 +36,12 @@ void session_connected(struct session *ss)
     }
 }
 
+void session_disconnected(struct session *ss)
+{
+    printf("{session.c}:[session_disconnected]\n");
+    free(ss->buf);
+}
+
 int is_number(char str)
 {
     printf("{session.c}:[is_number]\n");
@@ -87,6 +93,9 @@ void session_fsm(struct session *ss)
     case ss_connected:
         session_connected(ss);
         break;
+    case ss_disconnect:
+        session_disconnected(ss);
+        break;
     case ss_ready:
         break;
     case ss_error:
@@ -104,6 +113,10 @@ void session_do_read(struct session *ss)
         perror("read");
         return;
     }
+    if (ss->buf_size == 0) {
+        ss->state = ss_disconnect;
+    }
+
     ss->buf[ss->buf_size] = '\0';
     printf("server recived %d bytes, data: {%s}\n", ss->buf_size, ss->buf);
 

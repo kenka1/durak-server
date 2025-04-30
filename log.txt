@@ -1,0 +1,38 @@
+
+{game.c}:[defender_take_cards]
+/home/litk1pl/dev/C/617/game.c:214:38: runtime error: index -1 out of bounds for type 'int [36]'
+{game.c}:[game_next_round]
+{game.c}:[reset_table]
+{game.c}:[reset_table]
+{game.c}:[update_players]
+{game.c}:[select_next_attacker_and_defender]
+attacker: 1
+defender: 2
+{game.c}:[reset_round_time]
+{server.c}:[server_draw_game]
+{server.c}:[server_draw_rules]
+{server.c}:[server_draw_game_info]
+{server.c}:[server_draw_attack_table]
+{server.c}:[server_draw_defense_table]
+{server.c}:[server_draw_hand]
+{server.c}:[server_redraw]
+{session.c}:[session_do_write]
+{session.c}:[session_do_write]
+{session.c}:[session_do_write]
+/home/litk1pl/dev/C/617/session.c:128:51: runtime error: index -2 out of bounds for type 'char [4]'
+/home/litk1pl/dev/C/617/session.c:127:46: runtime error: index -273698896 out of bounds for type 'char *[9]'
+AddressSanitizer:DEADLYSIGNAL
+=================================================================
+==36335==ERROR: AddressSanitizer: SEGV on unknown address 0x5a608c37bde0 (pc 0x5a610eb939d3 bp 0x7fff36bd04f0 sp 0x7fff36bd04b0 T0)
+==36335==The signal is caused by a READ memory access.
+    #0 0x5a610eb939d3 in session_do_write /home/litk1pl/dev/C/617/session.c:126
+    #1 0x5a610eb9a258 in server_redraw /home/litk1pl/dev/C/617/server.c:271
+    #2 0x5a610eb9ac78 in server_start /home/litk1pl/dev/C/617/server.c:306
+    #3 0x5a610eb9ade7 in main /home/litk1pl/dev/C/617/main.c:8
+    #4 0x7d9de722a3b7 in __libc_start_call_main ../sysdeps/nptl/libc_start_call_main.h:58
+    #5 0x7d9de722a47a in __libc_start_main_impl ../csu/libc-start.c:360
+    #6 0x5a610eb896c4 in _start (/home/litk1pl/dev/C/617/build/server+0x206c4) (BuildId: 741d536c67699dbb2ec5f6121346de97536e2ac3)
+
+AddressSanitizer can not provide additional info.
+SUMMARY: AddressSanitizer: SEGV /home/litk1pl/dev/C/617/session.c:126 in session_do_write
+==36335==ABORTING
