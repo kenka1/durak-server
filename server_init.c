@@ -11,7 +11,6 @@
 #include <sys/eventfd.h>
 
 #include "server_init.h"
-#include "server.h"
 
 int server_init_eventfd()
 {

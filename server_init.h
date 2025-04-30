@@ -1,7 +1,7 @@
 #ifndef SERVER_INIT_MODULE
 #define SERVER_INIT_MODULE
 
-struct server;
+#include "struct_server.h"
 
 int server_init_eventfd();
 int server_init_listen_socket();
