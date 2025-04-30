@@ -17,28 +17,32 @@
 #include "session.h"
 #include "game.h"
 
-int server_init(struct server *s)
+int server_init_eventfd()
 {
-    printf("{server.c}:[server_init]\n");
-    int ls, opt, efd;
-    struct sockaddr_in addr;
-
-    efd = eventfd(0, EFD_NONBLOCK);
-    if (efd == -1) {
+    int efd = eventfd(0, EFD_NONBLOCK);
+    if (efd == -1)
         perror("eventfd");
-        return -1;
-    }
+    return efd;
+}
 
-    ls = socket(AF_INET, SOCK_STREAM, 0);
+int server_init_listen_socket()
+{
+    int ls = socket(AF_INET, SOCK_STREAM, 0);
     if (ls == -1) {
         perror("socket");
         return -1;
     }
+    return ls;
+}
+
+int server_bind_listen_socket(int ls)
+{
+    int opt;
+    struct sockaddr_in addr;
 
     opt = 1;
     if (setsockopt(ls, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1) {
         perror("setsockopt");
-        close(ls);
         return -1;
     }
 
@@ -49,16 +53,18 @@ int server_init(struct server *s)
 
     if (bind(ls, (struct sockaddr*)&addr, sizeof(addr)) == -1) {
         perror("bind");
-        close(ls);
         return -1;
     }
 
-    if (listen(ls, NUMBER_OF_PLAYERS) == -1) {
+    if (listen(ls, QUEUE_SIZE) == -1) {
         perror("listen");
-        close(ls);
         return -1;
     }
+    return 0;
+}
 
+void server_init_struct(struct server *s, int ls, int efd)
+{
     memset(s->fds, 0, sizeof(struct pollfd) * (NUMBER_OF_PLAYERS + SERVER_FDS));
     s->fds[LISTEND_FD].fd = ls;
     s->fds[LISTEND_FD].events = POLLIN;
@@ -70,9 +76,53 @@ int server_init(struct server *s)
 
     s->g = NULL;
     s->nfds = SERVER_FDS;
+    s->number_of_sessions = 0;
     s->buf_size = 0;
     s->ready = 0;
     s->state = ss_lobby;
+
+}
+
+void server_close_fd(int *fd)
+{
+    if (*fd != -1) {
+        if (close(*fd) == -1)
+            perror("close");
+        *fd = -1;
+    }
+}
+
+void server_cleanup(struct server *s)
+{
+    server_close_fd(&s->fds[LISTEND_FD].fd);
+    server_close_fd(&s->fds[EVENT_FD].fd);
+}
+
+
+int server_init(struct server *s)
+{
+    printf("{server.c}:[server_init]\n");
+    int ls, efd;
+
+    s->fds[LISTEND_FD].fd = -1;
+    s->fds[EVENT_FD].fd = -1;
+
+    if ((efd = server_init_eventfd()) == -1) {
+        server_cleanup(s);
+        return -1;
+    }
+
+    if ((ls = server_init_listen_socket()) == -1) {
+        server_cleanup(s);
+        return -1;
+    }
+
+    if (server_bind_listen_socket(ls) == -1) {
+        server_cleanup(s);
+        return -1;
+    }
+
+    server_init_struct(s, ls, efd);
 
     return 0;
 }
@@ -92,8 +142,11 @@ void server_accept(struct server *s)
     s->fds[s->nfds].events = POLLIN;
     s->sessions[s->nfds - SERVER_FDS] = session_init(fd, s->nfds - SERVER_FDS);
     s->nfds++;
+    s->number_of_sessions++;
     s->redraw = 1;
-    if (s->nfds == NUMBER_OF_PLAYERS + SERVER_FDS) {
+
+    /* FIX IT ??*/
+    if (s->number_of_sessions == MIN_NUMBER_OF_PLAYERS) {
         close(s->fds[0].fd);
         s->fds[0].fd = -1;
     }
@@ -120,6 +173,47 @@ void server_reset_notification(struct server *s)
     s->fds[1].revents = 0;
 }
 
+void server_close_session(struct server *s, int index)
+{
+    printf("{server.c}:[server_close_session]\n");
+    if (close(s->fds[index].fd) == -1)
+        perror("close");
+
+    s->nfds--;
+    for (int i = index; i < (int)s->nfds; i++)
+        s->fds[i] = s->fds[i + 1];
+
+    s->number_of_sessions--;
+    for (int i = index - SERVER_FDS; i < s->number_of_sessions; i++)
+        s->sessions[i] = s->sessions[i + 1];
+
+    s->sessions[s->number_of_sessions] = NULL;
+}
+
+void server_poll_events(struct server *s)
+{
+    if (s->state == ss_end)
+        return;
+
+    if (s->fds[LISTEND_FD].revents & POLLIN)
+        server_accept(s);
+
+    if (s->fds[EVENT_FD].revents & POLLIN)
+        server_reset_notification(s);
+
+    for (int i = SERVER_FDS; i < (int)s->nfds; i++) {
+        if (s->fds[i].revents & POLLIN) {
+            session_do_read(s->sessions[i - SERVER_FDS]);
+
+            if (s->sessions[i - SERVER_FDS]->state == ss_disconnect)
+                server_close_session(s, i);
+
+            if (s->g && s->sessions[i - SERVER_FDS]->state == ss_command)
+                game_handle_command(s->g, s->sessions[i - SERVER_FDS]);
+        }
+    }
+}
+
 void server_lobby(struct server *s)
 {
     printf("{server.c}:[server_lobby]\n");
@@ -136,7 +230,7 @@ void server_lobby(struct server *s)
 
     if (s->redraw) {
         s->buf_size = snprintf(s->buf, BUF_SIZE, LOBBY_TEXT,
-                 s->nfds - SERVER_FDS, NUMBER_OF_PLAYERS, s->ready, NUMBER_OF_PLAYERS);
+                 s->number_of_sessions, NUMBER_OF_PLAYERS, s->ready, NUMBER_OF_PLAYERS);
     }
 
     if (s->ready == NUMBER_OF_PLAYERS) {
@@ -215,7 +309,7 @@ void server_game_init(struct server *s)
     printf("{server.c}:[server_game_init]\n");
     s->g = game_init();
     s->g->redraw = &s->redraw;
-    for (int i = 0; i < NUMBER_OF_PLAYERS; i++)
+    for (int i = 0; i < s->number_of_sessions; i++)
         session_change_state(s->sessions[i], ss_error);
     s->state = ss_game;
     s->redraw = 1;
@@ -266,7 +360,7 @@ void server_redraw(struct server *s)
     printf("{server.c}:[server_redraw]\n");
     if (!s->redraw)
         return;
-    for (int i = 0; i < NUMBER_OF_PLAYERS; i++) {
+    for (int i = 0; i < s->number_of_sessions; i++) {
         if (s->sessions[i])
             session_do_write(s, i);
     }
@@ -284,24 +378,7 @@ void server_start(struct server *s)
         if (ret == -1)
             errRet("poll");
 
-        if (s->fds[LISTEND_FD].revents & POLLIN)
-            server_accept(s);
-
-        if (s->fds[EVENT_FD].revents & POLLIN)
-            server_reset_notification(s);
-
-
-        for (int i = SERVER_FDS; i < NUMBER_OF_PLAYERS + SERVER_FDS; i++) {
-            if (s->fds[i].revents & POLLIN) {
-                s->fds[i].revents = 0;
-                if (s->state == ss_end)
-                    break;
-                session_do_read(s->sessions[i - SERVER_FDS]);
-                if (s->g && s->sessions[i - SERVER_FDS]->state == ss_command)
-                    game_handle_command(s->g, s->sessions[i - SERVER_FDS]);
-            }
-        }
-
+        server_poll_events(s);
         server_fsm(s);
         server_redraw(s);
     }

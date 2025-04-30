@@ -13,7 +13,7 @@ struct game;
 
 #define LOBBY_TEXT "\033[2J\033[H" \
                    "Press ENTER to ready\n" \
-                   "Number of player in lobby: (%lu/%d) ================= Ready: (%d/%d)\r\n"
+                   "Number of player in lobby: (%d/%d) ================= Ready: (%d/%d)\r\n"
 
 #define GAME_RULES "\033[2J\033[H" \
                    "==============================RULES==============================\n" \
@@ -54,18 +54,28 @@ struct server{
     struct game *g;
     char  buf[BUF_SIZE];
     nfds_t nfds;
+    int number_of_sessions;
     int buf_size;
     int ready;
     int redraw;
     enum server_state state;
 };
 
+int server_init_eventfd();
+int server_init_listen_socket();
+int server_bind_listen_socket(int ls);
+void server_init_struct(struct server *s, int ls, int efd);
+void server_close_fd(int *fd);
+void server_cleanup(struct server *s);
 int server_init(struct server *s);
 
 void server_accept(struct server *s);
 
 void server_notification(struct server *s);
 void server_reset_notification(struct server *s);
+
+void server_close_session(struct server *s, int i);
+void server_poll_events(struct server *s);
 
 void server_lobby(struct server *s);
 
