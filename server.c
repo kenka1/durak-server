@@ -36,7 +36,7 @@ void server_accept(struct server *s)
     s->redraw = 1;
 
     /* FIX IT ??*/
-    if (s->number_of_sessions == MIN_NUMBER_OF_PLAYERS) {
+    if (s->number_of_sessions == NUMBER_OF_PLAYERS) {
         close(s->fds[0].fd);
         s->fds[0].fd = -1;
     }
@@ -97,8 +97,7 @@ void server_poll_events(struct server *s)
 
             if (s->sessions[i - SERVER_FDS]->state == ss_disconnect)
                 server_close_session(s, i);
-
-            if (s->g && s->sessions[i - SERVER_FDS]->state == ss_command)
+            else if (s->g && s->sessions[i - SERVER_FDS]->state == ss_command)
                 game_handle_command(s->g, s->sessions[i - SERVER_FDS]);
         }
     }
