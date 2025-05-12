@@ -8,6 +8,8 @@
 #include <time.h>
 #include <fcntl.h>
 #include <string.h>
+#include <time.h>
+#include <stdlib.h>
 #include <errno.h>
 
 #include "../constants.h"
@@ -60,56 +62,63 @@ int connect_to_server()
         return -1;
     }
     
-//    write(sockfd, &message, M_SIZE);
+    write(sockfd, &message, M_SIZE);
     return sockfd;
 }
 
-void throw_card_test(int sockfd)
+void attack_test(int sockfd, char *card)
 {
-    struct timespec duration, rem;
-    char buf[] = "0";
+    char buffer[32];
+    snprintf(buffer, 32, "%s\n", card);
+    write(sockfd, buffer, strlen(buffer));
+} 
 
-    duration.tv_sec = 1;
-    duration.tv_nsec = 0;
-
-    for (int i = 0; i < NUMBER_OF_CARDS; i++) {
-        write(sockfd, buf, strlen(buf));
-        nanosleep(&duration, &rem);
-    }
+void defense_test(int sockfd, char *card0, char *card1)
+{
+    char buffer[32];
+    snprintf(buffer, 32, "%s %s\n", card0, card1);
+    write(sockfd, buffer, strlen(buffer));
 } 
 
 int visual_test(int sockfd, char *buf)
 {
-    int count;
-
-    count = read(sockfd, buf, BUF_SIZE);
-    if (count == -1 && (errno != EAGAIN || errno != EWOULDBLOCK)) {
+    int count = read(sockfd, buf, BUF_SIZE);
+    if (count == -1) {
         return 0;
     }
-    if (count == -1) {
-        perror("read");
-        return - 1;
-    }
-    printf("count = %d\n", count);
     write(STDOUT_FILENO, buf, count);
     return count;
 }
 
 int main()
 {
-    int sockfd;
+    int sockfd, seed;
     char buf[BUF_SIZE];
+    struct timespec dur0, dur1, rem;
+    dur0.tv_sec = 0;
+    dur0.tv_nsec = 100000000;
+    dur0.tv_sec = 0;
+    dur0.tv_nsec = 500000000;
+    char *cards[] = {
+        "0", "1", "2", "3", "4", "5", 
+        "6", "7", "8", "9", "10", "11",
+        "12", "13", "14", "15", "16", "17",
+        "18", "19", "20", "21", "22", "23", 
+        "24", "25", "26", "27", "28", "29",
+        "30", "31", "32", "33", "34", "35"};
+
+    seed = time(NULL);
+    srand(seed);
 
     if ((sockfd = connect_to_server()) == -1)
         return 1;
     
-    close(sockfd);
-    /*
     while (1) {
-        //throw_card_test(sockfd);
         if (visual_test(sockfd, buf) == -1)
             break;
-        sleep(1);
+        attack_test(sockfd, cards[rand() % NUMBER_OF_CARDS]);
+        nanosleep(&dur0, &rem);
+        defense_test(sockfd, cards[rand() % DESK_SIZE], cards[rand() % NUMBER_OF_CARDS]);
+        nanosleep(&dur1, &rem);
     }
-    */
 }
