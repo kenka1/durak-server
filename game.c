@@ -65,6 +65,9 @@ int game_first_attacker(struct game *g)
             }
         }
     }
+
+    if (attacker == -1)
+        attacker = rand() / ((RAND_MAX + 1u) / *g->number_of_players);
     
     printf("min : %d\n", min);
     return attacker;
@@ -211,10 +214,14 @@ void game_next_round(struct game *g)
 void defender_take_cards(struct game *g)
 {
     printf("{game.c}:[defender_take_cards]\n");
-    for (int i = 0; i < g->defensive_count; i++) {
+    for (int i = 0; i < DESK_SIZE; i++) {
+        if (g->table_defensive[i] == -1)
+            continue;
         g->players[g->defender].cards[g->players[g->defender].cards_count++] = g->table_defensive[i];
     }
-    for (int i = 0; i < g->attack_count; i++) {
+    for (int i = 0; i < DESK_SIZE; i++) {
+        if (g->table_attack[i] == -1)
+            continue;
         g->players[g->defender].cards[g->players[g->defender].cards_count++] = g->table_attack[i];
     }
 }
@@ -294,6 +301,9 @@ int check_card_suit(int card, int suit)
 void defense(struct game *g, int *cards)
 {
     printf("{game.c}:[defense]\n");
+    printf("player: %d\ndefense: %s%c\n", g->defender,
+                                    card_imgs[g->players[g->defender].cards[cards[1]] / NUMBER_OF_SUITS],
+                                    card_suit_imgs[g->players[g->defender].cards[cards[1]] % NUMBER_OF_SUITS]);
     g->table_defensive[cards[0]] = g->players[g->defender].cards[cards[1]];
     player_threw_card(&g->players[g->defender], cards[1]);
     g->defensive_count++;
@@ -380,6 +390,9 @@ void player_threw_card(struct player *p, int card_index)
 void attack(struct game *g, int player_id, int card_index)
 {
     printf("{game.c}:[player_attack]\n");
+    printf("player: %d\nattack: %s%c\n", player_id,
+                                    card_imgs[g->players[player_id].cards[card_index] / NUMBER_OF_SUITS],
+                                    card_suit_imgs[g->players[player_id].cards[card_index] % NUMBER_OF_SUITS]);
     g->table_attack[g->attack_count++] = g->players[player_id].cards[card_index];
     player_threw_card(&g->players[player_id], card_index);
     g->state = gs_attack;

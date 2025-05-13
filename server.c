@@ -16,6 +16,16 @@
 #include "constants.h"
 #include "session.h"
 #include "game.h"
+#include "struct_server.h"
+
+void close_server_fd(int *fd)
+{
+    if (*fd != -1) {
+        if (close(*fd) == -1)
+            perror("close");
+        *fd = -1;
+    }
+}
 
 void server_accept(struct server *s)
 {
@@ -36,10 +46,8 @@ void server_accept(struct server *s)
     s->redraw = 1;
 
     /* FIX IT ??*/
-    if (s->number_of_sessions == NUMBER_OF_PLAYERS) {
-        close(s->fds[0].fd);
-        s->fds[0].fd = -1;
-    }
+    if (s->number_of_sessions == NUMBER_OF_PLAYERS)
+        close_server_fd(&s->fds[LISTEND_FD].fd);
 }
 
 void server_notification(struct server *s)
@@ -66,22 +74,20 @@ void server_reset_notification(struct server *s)
 void server_close_session(struct server *s, int index)
 {
     printf("{server.c}:[server_close_session]\n");
-    if (close(s->fds[index].fd) == -1)
+    if (!s->sessions[index])
+        return;
+
+    if (close(s->sessions[index]->fd) == -1)
         perror("close");
 
-    s->nfds--;
-    for (int i = index; i < (int)s->nfds; i++)
-        s->fds[i] = s->fds[i + 1];
-
-    s->number_of_sessions--;
-    for (int i = index - SERVER_FDS; i < s->number_of_sessions; i++)
-        s->sessions[i] = s->sessions[i + 1];
-
-    s->sessions[s->number_of_sessions] = NULL;
+    free(s->sessions[index]->buf);
+    free(s->sessions[index]);
+    s->sessions[index] = NULL;
 }
 
 void server_poll_events(struct server *s)
 {
+    printf("{server.c}:[server_poll_events]\n");
     if (s->state == ss_end)
         return;
 
@@ -95,9 +101,12 @@ void server_poll_events(struct server *s)
         if (s->fds[i].revents & POLLIN) {
             session_do_read(s->sessions[i - SERVER_FDS]);
 
+            /*
+            FIX IT ??
             if (s->sessions[i - SERVER_FDS]->state == ss_disconnect)
                 server_close_session(s, i);
-            else if (s->g && s->sessions[i - SERVER_FDS]->state == ss_command)
+            */
+            if (s->g && s->sessions[i - SERVER_FDS]->state == ss_command)
                 game_handle_command(s->g, s->sessions[i - SERVER_FDS]);
         }
     }
@@ -219,9 +228,11 @@ void server_end(struct server *s)
 {
     printf("{server.c}:[server_end]\n");
     if (s->g->state == gs_game_end)
-        s->buf_size = snprintf(s->buf, BUF_SIZE, "GAME OVER, player %d lose", s->g->defender);
+        s->buf_size = snprintf(s->buf, BUF_SIZE, "\033[2J\033[H" \
+                               "=====GAME OVER=====\nPlayer %d lose", s->g->defender);
     else
-        s->buf_size = snprintf(s->buf, BUF_SIZE, "DRAW");
+        s->buf_size = snprintf(s->buf, BUF_SIZE, "\033[2J\033[H" \
+                               "=====GAME OVER=====\nDRAW");
 }
 
 void server_fsm(struct server *s)
@@ -255,6 +266,20 @@ void server_redraw(struct server *s)
     s->redraw = 0;
 }
 
+int server_close(struct server *s)
+{
+    printf("{server.c}:[server_close]\n");
+    if (s->state != ss_end)
+        return 0;
+
+    for (int i = 0; i < s->number_of_sessions; i++)
+        server_close_session(s, i);
+    free(s->g);
+    close_server_fd(&s->fds[LISTEND_FD].fd);
+    close_server_fd(&s->fds[EVENT_FD].fd);
+    return 1;
+}
+
 void server_start(struct server *s)
 {
     printf("{server.c}:[server_start]\n");
@@ -269,5 +294,7 @@ void server_start(struct server *s)
         server_poll_events(s);
         server_fsm(s);
         server_redraw(s);
+        if (server_close(s))
+            break;
     }
 }

@@ -34,6 +34,7 @@
                     } while(0);
 
 
+void close_server_fd(int *fd);
 void server_accept(struct server *s);
 
 void server_notification(struct server *s);
@@ -59,6 +60,9 @@ void server_end(struct server *s);
 void server_fsm(struct server *s);
 
 void server_redraw(struct server *s);
+
+int server_close(struct server *s);
+
 void server_start(struct server *s);
 
 #endif
