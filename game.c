@@ -54,7 +54,7 @@ int game_first_attacker(struct game *g)
     printf("{game.c}:[game_first_attacker]\n");
     int attacker = -1;
     int min = NUMBER_OF_CARDS + 1;
-    for (int i = 0; i < NUMBER_OF_PLAYERS; i++) {
+    for (int i = 0; i < *g->number_of_players; i++) {
         for (int k = 0; k < NUMBER_OF_INIT_CARDS; k++) {
             int card = g->players[i].cards[k];
             if (card % NUMBER_OF_SUITS == g->trump_suit) {
@@ -74,14 +74,14 @@ void game_first_attacker_and_defender(struct game *g)
 {
     printf("{game.c}:[game_first_attacker_and_defender]\n");
     g->attacker = game_first_attacker(g);
-    g->defender = (g->attacker + 1) % NUMBER_OF_PLAYERS;
+    g->defender = (g->attacker + 1) % *g->number_of_players;
     printf("attacker: %d\ndefender: %d\n", g->attacker, g->defender);
 }
 
 void game_init_players(struct game *g)
 {
     printf("{game.c}:[game_init_players]\n");
-    for (int i = 0; i < NUMBER_OF_PLAYERS; i++) {
+    for (int i = 0; i < *g->number_of_players; i++) {
         g->players[i].cards_count = 0;
         fill_players_cards(g, i);
     }
@@ -98,26 +98,27 @@ void game_init_time(struct game_time *t)
     t->number_of_round = 0;
 }
 
-struct game* game_init()
+void game_init(struct server *s)
 {
     printf("{game.c}:[game_init]\n");
-    struct game *g = malloc(sizeof(struct game));
-    game_shuffling(g);
-    game_init_players(g);
-    game_init_time(&g->t);
-    return g;
+    s->g = malloc(sizeof(struct game));
+    s->g->redraw = &s->redraw;
+    s->g->number_of_players = &s->number_of_sessions;
+    game_shuffling(s->g);
+    game_init_players(s->g);
+    game_init_time(&s->g->t);
 }
 
 int is_game_end(struct game *g)
 {
     printf("{game.c}:[is_game_end]\n");
     for (int i = 0; i < NUMBER_OF_PLAYERS; i++) {
-        if (i == g->defender)
+        if (g->defender == i)
             continue;
         if (g->players[i].cards_count != 0)
             return 0;
     }
-    
+
     if (g->players[g->defender].cards_count != 0)
         g->state = gs_game_end;
     else
@@ -312,9 +313,7 @@ void player_do_defense(struct game *g, int *cards)
     if (cards_same_suit(attack_card, def_card)) {
         if (def_card > attack_card)
             defense(g, cards);
-    }
-
-    if (check_card_suit(def_card, g->trump_suit))
+    } else if (check_card_suit(def_card, g->trump_suit))
         defense(g, cards);
 }
 

@@ -196,8 +196,7 @@ void server_draw_game(struct server *s)
 void server_game_init(struct server *s)
 {
     printf("{server.c}:[server_game_init]\n");
-    s->g = game_init();
-    s->g->redraw = &s->redraw;
+    game_init(s);
     for (int i = 0; i < s->number_of_sessions; i++)
         session_change_state(s->sessions[i], ss_error);
     s->state = ss_game;

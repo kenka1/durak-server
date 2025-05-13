@@ -40,6 +40,7 @@ struct game {
     int defender;
     int trump_suit;
     int *redraw;
+    const int *number_of_players;
     enum game_state state;
     struct game_time t;
 };
@@ -50,7 +51,7 @@ int game_first_attacker(struct game *g);
 void game_first_attacker_and_defender(struct game *g);
 void game_init_players(struct game *g);
 void game_init_time(struct game_time *t);
-struct game* game_init();
+void game_init(struct server *s);
 
 int is_game_end(struct game *g);
 void game_end(struct game *g);
