@@ -71,20 +71,6 @@ void server_reset_notification(struct server *s)
     s->fds[1].revents = 0;
 }
 
-void server_close_session(struct server *s, int index)
-{
-    printf("{server.c}:[server_close_session]\n");
-    if (!s->sessions[index])
-        return;
-
-    if (close(s->sessions[index]->fd) == -1)
-        perror("close");
-
-    free(s->sessions[index]->buf);
-    free(s->sessions[index]);
-    s->sessions[index] = NULL;
-}
-
 void server_poll_events(struct server *s)
 {
     printf("{server.c}:[server_poll_events]\n");
@@ -264,6 +250,20 @@ void server_redraw(struct server *s)
             session_do_write(s, i);
     }
     s->redraw = 0;
+}
+
+void server_close_session(struct server *s, int index)
+{
+    printf("{server.c}:[server_close_session]\n");
+    if (!s->sessions[index])
+        return;
+
+    if (close(s->sessions[index]->fd) == -1)
+        perror("close");
+
+    free(s->sessions[index]->buf);
+    free(s->sessions[index]);
+    s->sessions[index] = NULL;
 }
 
 int server_close(struct server *s)

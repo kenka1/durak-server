@@ -40,7 +40,6 @@ void server_accept(struct server *s);
 void server_notification(struct server *s);
 void server_reset_notification(struct server *s);
 
-void server_close_session(struct server *s, int i);
 void server_poll_events(struct server *s);
 
 void server_lobby(struct server *s);
@@ -61,6 +60,7 @@ void server_fsm(struct server *s);
 
 void server_redraw(struct server *s);
 
+void server_close_session(struct server *s, int i);
 int server_close(struct server *s);
 
 void server_start(struct server *s);
